@@ -4,20 +4,19 @@ import shlex # реализует функции для анализа синт�
 import argparse # модуль для обработки аргументов командной строки
 import csv
 import base64
-from io import *
 
 
 class VFSNode:
-    def __init__(self, name, type, content):
+    def __init__(self, name, node_type, content=None):
         self.name = name
-        self.type = type
+        self.type = node_type
         self.content = content
         self.children = {}
         self.parent = None
         
 class VFS:
     def __init__(self):
-        self.root = VFSNode(name='/', type='dir', content=None)
+        self.root = VFSNode(name='/', node_type='dir', content=None)
         self.current = self.root
         self.current_path = '/'
     def get_cur_dir(self):
@@ -27,6 +26,10 @@ class VFS:
     def parse_path(self, path):
         return [comp for comp in path.split('/') if comp]
     def find_node(self, path):
+        if not path:
+            return None
+        if path[0] != '/':
+            path = self.get_abs_path(path)
         current = self.root
         path_comp = self.parse_path(path)
         
@@ -38,34 +41,36 @@ class VFS:
         return current
         
     def decode_content(self, content):
-        if not isinstance(content, str) or not content: # Добавьте эту проверку
+        if not isinstance(content, str) or not content:
             return content
         try:
             decoded_bytes = base64.b64decode(content)
             return decoded_bytes.decode('utf-8', errors='ignore')
-        except Exception as e:
+        except Exception:
             return content
     def load_from_csv(self, vfs_path):
         try:
             with open(vfs_path, 'r', newline='') as f:
                 reader = csv.DictReader(f, delimiter=';')
-                self.root = VFSNode(name='/', type='dir', content=None)
+                self.root = VFSNode(name='/', node_type='dir', content=None)
                 
                 for row in reader:
                     path = row['path']
-                    node_type = row['type']
+                    node_type1 = row['type']
                     content = row['content']
                     
-                    if not path or not node_type:
+                    if not path or not node_type1:
                         raise ValueError(f"Missing 'path' or 'type in row:{row}")
                     if path=='/':
                         continue
-                    node_name = path.split('/')[-1]
-                    parent_path = '/'.join(path.split('/')[:-1]) if len(path.split('/')) > 2 else '/'
+                    # вычисляем имя узла и путь родителя
+                    comps = [c for c in path.split('/') if c]
+                    node_name = comps[-1]
+                    parent_path = '/' + '/'.join(comps[:-1]) if len(comps) > 1 else '/'
                     parent_node = self.find_node(parent_path)
                     if parent_node is None or parent_node.type != 'dir':
                         raise ValueError(f"Invalid VFS structure: Parent directory not found for {path}")
-                    new_node = VFSNode(name=node_name, type=node_type, content=content)
+                    new_node = VFSNode(name=node_name, node_type=node_type1, content=content)
                     new_node.parent = parent_node
                     
                     parent_node.children[node_name] = new_node
@@ -86,15 +91,38 @@ class VFS:
             print("\n--- Message of the Day ---")
             print(content)
             print("--------------------------\n")
+    def get_abs_path(self, path):
+        if path[0] == '/':
+            return path
+        base_path = self.current_path
+        if base_path[-1] != '/':
+            base_path += '/'
+        return base_path + path
+    def change_dir_logic(self, target_path):
+        if target_path == '..':
+            if self.current.parent:
+                return self.current.parent
+            return self.current
+        elif target_path == '.':
+            return self.current
+        
+        abs_path = self.get_abs_path(target_path)
+        target_node = self.find_node(abs_path)
+        if target_node and target_node.type == 'dir':
+            return target_node
+        return None
 
 # создание приглашения к вводу
 def get_prompt():
     username = getpass.getuser()
     hostname = socket.gethostname()
-    curr_dir = "~"
-    return f"{username}@{hostname}%{curr_dir}$"
+    if vfs.current_path == '/':
+        cur_display = '~'
+    else:
+        cur_display = vfs.current_path
+    return f"{username}@{hostname}%{cur_display}$"
 
-VFS = VFS()
+vfs = VFS()
 
 
 #парсер команд, отделяет команду от аргументов
@@ -108,23 +136,84 @@ def parser_comm(commLine):
 
 #временные команды заглушки
 def ls_command(args):
-    print(f"ls: stub command with arguments: {' '.join(args)}")
-
+    if not args:
+        target_node = vfs.current
+    else:
+        path = args[0]
+        abs_path = vfs.get_abs_path(path)
+        target_node = vfs.find_node(abs_path)
+    if not target_node:
+        print(f"ls: cannot access '{args[0]}': No such file or directory")
+        return
+    if target_node.type != 'dir':
+        print(target_node.name)
+        return
+    if not target_node.children:
+        return
+    
+    for name in sorted(target_node.children.keys()):
+        node = target_node.children[name]
+        indicator = '/' if node.type == 'dir' else ''
+        print(f"{name}{indicator}")
 def cd_command(args):
-    print(f"cd: stub command with arguments: {' '.join(args)}")
+    if not args or args[0] == '~':
+        vfs.current = vfs.root
+        vfs.current_path = '/'
+        return
+    target_path = args[0]
+    new_node = vfs.change_dir_logic(target_path)
+    if not new_node:
+        print(f"cd: no such file or directory: {target_path}")
+        return
+    
+    if new_node != vfs.current:
+        vfs.current = new_node
+        if target_path == '..':
+            if vfs.current_path.count('/')>1:
+                vfs.current_path = '/'.join(vfs.current_path.split('/')[:-1])
+                if not vfs.current_path:
+                    vfs.current_path = '/'
+        elif target_path == '.':
+            pass
+        else:
+            vfs.current_path = vfs.get_abs_path(target_path)
 
 def exit_command(args):
     print("Exit")
     raise SystemExit
 
+def du_command(args):
+    def count_nodes(node):
+        count = 1
+        if node.type == 'dir':
+            for child in node.children.values():
+                count += count_nodes(child)
+        return count
+
+    path = args[0] if args else vfs.current_path
+    abs_path = vfs.get_abs_path(path)
+    target_node = vfs.find_node(abs_path)
+    if not target_node:
+        print(f"du: cannot access '{path}': No such file or directory")
+        return
+    
+    size = count_nodes(target_node)
+    
+    print(f"{size}\t{path}")
+
+def echo_command(args):
+    print(" ".join(args))
+
 commands = {
     'ls' :ls_command,
     'cd' : cd_command,
-    'exit' : exit_command
+    'exit' : exit_command,
+    'du' : du_command,
+    'echo' : echo_command
 }  
 
 # функция запуска скрипта
-def run_scrpit(script_path):
+def run_script(script_path):
     try:
         f = open(script_path, 'r') 
         for line in f:
@@ -183,11 +272,12 @@ def main():
     print(f"Script path: {args.script_path}")
     
     if args.vfs_path:
-        VFS.load_from_csv(args.vfs_path)
-        VFS.display_motd()
-    elif args.script_path:
-        run_scrpit(args.script_path)
-    else:
+        vfs.load_from_csv(args.vfs_path)
+        vfs.display_motd()
+
+    if args.script_path:
+        run_script(args.script_path)
+    elif not args.script_path:
         main_repl()
     
 if __name__ == "__main__":

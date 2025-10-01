@@ -1,0 +1,41 @@
+echo "--- Тест 1: ls и du в корне (/) ---"
+ls /
+du /
+
+echo "--- Тест 2: Навигация cd ---"
+cd /home/user
+ls
+echo "Текущий путь после cd: $(VFS.current_path)" 
+
+echo "--- Тест 3: cd . и cd .. ---"
+cd .
+ls
+cd ..
+ls
+cd ..
+
+echo "--- Тест 4: Обработка ошибок ---"
+ls /nonexistent
+cd /etc/conf/sys.cfg
+
+echo "--- Тест 5: du на поддереве ---"
+du /etc
+du /home
+
+echo "--- Тест 6: echo ---"
+echo Hello, World!
+echo "Argument with spaces" and another one
+
+echo "--- Тест 7: ls на файле ---"
+ls /motd
+
+echo "--- Тест 8: du без аргументов ---"
+du
+
+echo "--- Тест 9: echo без аргументов ---"
+echo
+
+echo "--- Тест 10: неизвестная команда ---"
+foobar
+
+exit
