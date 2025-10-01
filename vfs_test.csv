@@ -1,0 +1,12 @@
+path;type;content
+/;dir;
+/motd;file;**Welcome to the VFS Shell!** The system is loaded successfully.
+/home;dir;
+/home/user;dir;
+/home/user/notes.txt;file;Remember to finish Stage 4 tasks on time!
+/etc;dir;
+/etc/conf;dir;
+/etc/conf/sys.cfg;file;TIMEZONE=Europe/Amsterdam
+/bin;dir;
+/bin/data.bin;file;SGVsbG8gQmluYXJ5IERhdGEh # Это Base64 для "Hello Binary Data!"
+/root;dir;
