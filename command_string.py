@@ -204,12 +204,102 @@ def du_command(args):
 def echo_command(args):
     print(" ".join(args))
 
+def mkdir_command(args):
+    if not args:
+        print("mkdir: missing operand")
+        return
+    elif len(args) > 1:
+        print("mkdir: too many arguments")
+        return
+    path = args[0]
+    abs_path = vfs.get_abs_path(path)
+    comp = [c for c in abs_path.split('/') if c]
+    if not comp:
+        print(f"mkdir: cannot create directory '{path}': File exists")
+        return
+    new_dir_name = comp[-1]
+    parent_path = '/' + '/'.join(comp[:-1]) if len(comp)>1 else '/'
+    parent_node = vfs.find_node(parent_path)
+    if not parent_node or parent_node.type != 'dir':
+        print (f"mkdir: cannot create directory '{path}': No such file or directory")
+        return
+    if new_dir_name in parent_node.children:
+        print (f"mkdir: cannot create directory '{path}': File exists")
+        return
+    
+    new_node = VFSNode(name = new_dir_name, node_type='dir',content= None)
+    new_node.parent = parent_node
+    
+    parent_node.children[new_dir_name] = new_node
+    
+def mv_command(args):
+    if len(args) != 2:
+        print("mv: missing file operand")
+        return
+    source_node_path = args[0]
+    target_node_path = args[1]
+    if source_node_path == '/':
+        print(f"mv: cannot move root '{source_node_path}': Invalid source path")
+        return
+    
+    source_abs_path =vfs.get_abs_path(source_node_path)
+    source_node = vfs.find_node(source_abs_path)
+    
+    if not source_node:
+        print(f"mv: cannot stat '{source_node_path}': No such file or directory")
+        return
+    
+    target_abs_path = vfs.get_abs_path(target_node_path)
+    target_node = vfs.find_node(target_abs_path)
+    
+    if not target_node:
+        #Переименовываем
+        target_comps = [c for c in target_abs_path.split('/') if c]
+        if not target_comps:
+            print(f"mv: invalid target '{target_node_path}'")
+            return
+        new_name = target_comps[-1]
+        parent_path = '/' + '/'.join(target_comps[:-1]) if len(target_comps)>1 else '/'
+        parent_target_node = vfs.find_node(parent_path)
+        if not parent_target_node or parent_target_node.type != 'dir':
+            print(f"mv: cannot overwrite '{target_node_path}': No such file or directory")
+            return
+        if new_name in parent_target_node.children:
+            print(f"mv: cannot overwrite '{target_node_path}': File exists")
+            return
+        #Удаляем из старого родителя
+        old_parent = source_node.parent
+        old_name = source_node.name
+        if not old_parent:
+            print(f"mv: cannot overwrite '{source_node_path}': Invalid source path")
+            return
+        del old_parent.children[old_name]
+        #Добавляем в новый родитель
+        source_node.name = new_name
+        parent_target_node.children[new_name] = source_node
+        source_node.parent = parent_target_node
+    else:
+        #Перемещение
+        if target_node.type != 'dir':
+            print(f"mv: target '{target_node_path}' is not a directory")
+            return
+        if source_node.name in target_node.children:
+            print(f"mv: cannot move '{source_node_path}': File exists in target directory")
+            return
+        old_parent = source_node.parent
+        del old_parent.children[source_node.name]
+        target_node.children[source_node.name] = source_node
+        source_node.parent = target_node
+        
+        
 commands = {
     'ls' :ls_command,
     'cd' : cd_command,
     'exit' : exit_command,
     'du' : du_command,
-    'echo' : echo_command
+    'echo' : echo_command,
+    'mkdir': mkdir_command,
+    'mv': mv_command
 }  
 
 # функция запуска скрипта

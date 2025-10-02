@@ -1,0 +1,72 @@
+echo "--- A. БАЗОВЫЕ КОМАНДЫ (ls, du, cd, echo) ---"
+echo "Тест A.1: ls и du в корне (/) и навигация"
+ls /
+du /
+cd /home/user
+ls
+cd /bin
+ls data.bin
+cd /
+
+echo "Тест A.2: du на поддереве и файле"
+du /etc
+du /home/user/notes.txt
+
+echo "Тест A.3: echo"
+echo "Hello, VFS Shell! This is Stage 5."
+
+echo "--- B. МОДИФИКАЦИЯ VFS: mkdir ---"
+
+echo "Тест B.1: Успешное создание директорий"
+mkdir /new_project
+mkdir /home/user/docs
+mkdir /new_project/src
+ls /
+ls /home/user
+
+echo "Тест B.2: Ошибки mkdir"
+mkdir /etc
+mkdir /nonexistent/path
+mkdir /etc/conf/sys.cfg/fail_dir
+mkdir
+
+echo "--- C. МОДИФИКАЦИЯ VFS: mv (Перемещение и Переименование) ---"
+echo "Тест C.1: mv (Переименование файла в том же каталоге)"
+mv /home/user/notes.txt /home/user/README.md
+ls /home/user
+
+echo "Тест C.2: mv (Перемещение файла в другой каталог)"
+mv /home/user/README.md /new_project/
+ls /home/user
+ls /new_project/
+
+echo "Тест C.3: mv (Перемещение директории)"
+mv /home/user/docs /new_project/
+ls /new_project
+
+echo "Тест C.4: mv (Переименование директории)"
+mv /new_project/docs /new_project/manuals
+ls /new_project
+
+echo "--- D. ОШИБКИ mv (Сложные сценарии) ---"
+
+echo "Тест D.1: Источник не найден"
+mv /not_here /where
+
+echo "Тест D.2: Цель - не директория при перемещении"
+mv /etc/conf /bin/data.bin
+
+echo "Тест D.3: Конфликт имени (файл существует в целевой папке)"
+
+mkdir /new_project/test.txt
+mv /new_project/test.txt /new_project/src/
+
+echo "Тест D.4: Перемещение корня"
+mv / /etc
+
+echo "--- E. ФИНАЛЬНАЯ ПРОВЕРКА СОСТОЯНИЯ ---"
+cd /new_project
+ls
+cd /
+du /
+exit
